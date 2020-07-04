@@ -1,0 +1,6 @@
+- endpoint: my_endpoint
+  timeout: 10s
+  targets:
+    - https://google.com/
+  repeatAfter: 10s
+  backoffFactor: 2
