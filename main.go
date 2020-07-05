@@ -141,13 +141,14 @@ func main() {
 					if onRepeat {
 						repeatCounter.Inc()
 						event = "Repeat"
+						lastTimeout = time.Duration(e.BackoffFactor * float64(lastTimeout))
 					} else {
 						timeoutCounter.Inc()
 						event = "Timeout"
+						lastTimeout = e.RepeatAfter
 					}
 
 					onRepeat = true
-					lastTimeout = time.Duration(e.BackoffFactor * float64(lastTimeout))
 					timer.Reset(lastTimeout)
 
 					log.Println(event + " for endpoint \"" + endpoint.Endpoint + "\"... ")
