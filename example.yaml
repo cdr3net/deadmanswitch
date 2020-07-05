@@ -1,6 +1,15 @@
 - endpoint: my_endpoint
   timeout: 10s
   targets:
-    - https://google.com/
+    - post:
+        url: https://hooks.slack.com/services/XXX/XXX/XXX
+        body:
+          payload: |
+            {"text": "Deadman"}
+    - post:
+        url: "https://api.telegram.org/bot123123123:XXXXX/sendMessage"
+        body:
+          chat_id: 123123123
+          text: "Deadman"
   repeatAfter: 10s
   backoffFactor: 2

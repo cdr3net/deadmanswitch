@@ -4,7 +4,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,10 +16,34 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type GetTarget struct {
+	URL string `yaml:"url"`
+}
+
+type PostBody interface{}
+
+type PostTarget struct {
+	URL  string   `yaml:"url"`
+	Body PostBody `yaml:"body"`
+}
+
+type Target struct {
+	Get  *GetTarget  `yaml:"get"`
+	Post *PostTarget `yaml:"post"`
+}
+
+func (t Target) URL() string {
+	if t.Post != nil {
+		return t.Post.URL
+	} else {
+		return t.Get.URL
+	}
+}
+
 type EndpointRaw struct {
 	Endpoint      string   `yaml:"endpoint"`
 	Timeout       string   `yaml:"timeout"`
-	Targets       []string `yaml:"targets"`
+	Targets       []Target `yaml:"targets"`
 	RepeatAfter   string   `yaml:"repeatAfter"`
 	BackoffFactor float64  `yaml:"backoffFactor"`
 }
@@ -24,7 +51,7 @@ type EndpointRaw struct {
 type Endpoint struct {
 	Endpoint      string
 	Timeout       time.Duration
-	Targets       []string
+	Targets       []Target
 	RepeatAfter   time.Duration
 	BackoffFactor float64
 }
@@ -87,7 +114,7 @@ func main() {
 		for _, t := range endpoint.Targets {
 			errorCallingTargetCounter = append(
 				errorCallingTargetCounter,
-				errorCallingTargetCounters.With(map[string]string{"endpoint": e.Endpoint, "target": t}),
+				errorCallingTargetCounters.With(map[string]string{"endpoint": e.Endpoint, "target": t.URL()}),
 			)
 		}
 
@@ -119,15 +146,62 @@ func main() {
 					timer.Reset(lastTimeout)
 
 					log.Println(event + " for endpoint \"" + endpoint.Endpoint + "\"... ")
-					for i := range endpoint.Targets {
-						msg := "Calling \"" + endpoint.Targets[i] + "\" : "
-						_, err := http.Get(endpoint.Targets[i])
+					for i, t := range endpoint.Targets {
+						var err error
+						var response *http.Response
+						var msg string
+
+						if t.Get != nil {
+
+							response, err = http.Get(t.Get.URL)
+
+						} else if t.Post != nil {
+
+							var request *http.Request
+							var body string
+
+							switch b := t.Post.Body.(type) {
+							case string:
+								body = b
+							case map[interface{}]interface{}:
+								data := url.Values{}
+								for k, v := range b {
+									switch vv := v.(type) {
+									case string:
+										data.Add(k.(string), vv)
+									case int:
+										data.Add(k.(string), strconv.Itoa(vv))
+									}
+								}
+								body = data.Encode()
+							default:
+								log.Println("Unknown body type for: " + t.Post.URL)
+								continue
+							}
+
+							request, err = http.NewRequest("POST", t.Post.URL, strings.NewReader(body))
+							request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+							request.Header.Add("Content-Length", strconv.Itoa(len(body)))
+
+							if err != nil {
+								log.Println("Error creating ", t.Post.URL, err)
+								continue
+							}
+
+							msg = "POST \"" + t.Post.URL + "\" : "
+							response, err = http.DefaultClient.Do(request)
+						}
+
 						if err != nil {
 							errorCallingTargetCounter[i].Inc()
 							log.Println(msg, err)
+						} else if response.StatusCode != 200 {
+							errorCallingTargetCounter[i].Inc()
+							log.Println(msg, response.Body)
 						} else {
 							log.Println(msg, "success.")
 						}
+
 					}
 				}
 			}
