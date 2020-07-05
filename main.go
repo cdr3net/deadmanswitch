@@ -101,6 +101,8 @@ func main() {
 		}
 	}
 
+	resetCounters := promauto.NewCounterVec(
+		prometheus.CounterOpts{Name: "deadmanswitch_reset"}, []string{"endpoint"})
 	timeoutCounters := promauto.NewCounterVec(
 		prometheus.CounterOpts{Name: "deadmanswitch_timeout"}, []string{"endpoint"})
 	repeatCounters := promauto.NewCounterVec(
@@ -112,6 +114,7 @@ func main() {
 		ch := make(chan struct{})
 
 		endpoint := e
+		resetCounter := resetCounters.With(map[string]string{"endpoint": e.Endpoint})
 		timeoutCounter := timeoutCounters.With(map[string]string{"endpoint": e.Endpoint})
 		repeatCounter := repeatCounters.With(map[string]string{"endpoint": e.Endpoint})
 
@@ -132,6 +135,7 @@ func main() {
 			for {
 				select {
 				case <-ch:
+					resetCounter.Inc()
 					onRepeat = false
 					lastTimeout = endpoint.Timeout
 					timer.Reset(lastTimeout)
