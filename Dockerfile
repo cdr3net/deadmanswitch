@@ -21,4 +21,4 @@ COPY --from=builder /build/deadmanswitch.exe /opt/deadmanswitch
 
 EXPOSE 8080
 
-ENTRYPOINT ["/opt/deadmanswitch", "/config.yaml"]
+ENTRYPOINT ["/opt/deadmanswitch", "/etc/deadmanswitch.yaml"]
