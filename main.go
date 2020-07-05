@@ -82,7 +82,7 @@ func main() {
 
 	metricsEndpoint := "/metrics"
 	if m, ok := os.LookupEnv("METRICS_ENDPOINT"); ok {
-		metricsEndpoint = m
+		metricsEndpoint = "/" + m
 	}
 
 	if len(os.Args) >= 2 {
