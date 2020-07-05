@@ -80,6 +80,11 @@ func parseEndpoint(e EndpointRaw) Endpoint {
 func main() {
 	var endpoints []Endpoint
 
+	metricsEndpoint := "/metrics"
+	if m, ok := os.LookupEnv("METRICS_ENDPOINT"); ok {
+		metricsEndpoint = m
+	}
+
 	if len(os.Args) >= 2 {
 		configContent, err := ioutil.ReadFile(os.Args[1])
 		if err != nil {
@@ -212,8 +217,7 @@ func main() {
 		})
 	}
 
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle(metricsEndpoint, promhttp.Handler())
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
-
 }
